@@ -1,0 +1,18 @@
+{
+  "name": "riss",
+  "type": "module",
+  "version": "1.0.0",
+  "description": "Reversible Image Secret Sharing library",
+  "main": "main.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "node main.js"
+  },
+  "author": "Ivan Blinov",
+  "license": "ISC",
+  "dependencies": {
+    "big.js": "^6.1.1",
+    "compute-gcd": "^1.2.1",
+    "image-js": "^0.34.1"
+  }
+}
