@@ -1,43 +1,71 @@
 import Big from "big.js"
 
+const TH = 16;
 // STEP 1 encoding
-const primeNumberList = [
-    131, 137, 139, 149,
-    151, 157, 163, 167, 
-    173, 179, 181, 191, 
-    193, 197, 199, 211, 
-    223]
-export function encrypt(shares, threshold, secretPixels, covers){
-    // const p = primeNumberList[Math.floor(Math.random()*primeNumberList.length)]
-    const p = 131
-    console.log(p, 'p')
-    let m = [241,247,251,253,254,255]
+const mVars = [233, 239, 241, 247, 251, 253, 254, 255]
+
+function checkSizes(secretSize, coverSize){
+    if (secretSize !== coverSize && 4*secretSize !== coverSize){
+        throw new Error("Size of secret image and on of the cover images are not matched")
+    }
+}
+
+function MRandomize(num){
+    const mVars = [233, 239, 241, 247, 251, 253, 254, 255]
+    return mVars.slice(-num).sort((a,b)=>0.5-Math.random());
+}
+
+function CalcConsts(sharesNum, threshold, m){
+    const p = 131;
+
     let M = Big(1)
-    m = m.slice(-shares)
-    console.log(m, 'mi array')
 
     const m_thresh = m.slice(-threshold)
     m_thresh.forEach((mi) => M = M.times(mi))
     console.log(M.toString(), 'M')
 
     let N = Big(1)
-    // m_thresh.forEach(mi => N = N.times(mi))
+
     for (let i = 1; i < threshold; i++) {
-        N = N.times(m[shares-i])  
+        N = N.times(m[sharesNum-i])  
     }
     console.log(N.toString(), 'N')
 
-    console.log(N.times(p).toString(), 'nmultp')
-    console.log(M.minus(N.times(p)).toString(), 'equasion1')
+    
+    const T = M.div(p).minus(1).round(undefined, Big.roundDown).div(2).round()
+
+    return [T, M, N, p];
+
+}
+
+function CalcY(x, T, leftBound, difference, p){
+    if (x>=0 && x<p){
+        const A = difference.times(Math.random()).round().plus(leftBound)
+        return A.times(p).plus(x)
+    }
+    else {
+        const A = T.times(Math.random()).round()
+        return A.times(p).plus(x).minus(p)
+    }
+    
+}
+
+
+export function encrypt(sharesNum, threshold, secretPixels, covers, TH=16){
+    covers.forEach((cover)=>{
+        checkSizes(secretPixels.length, cover.length);
+    })
+    
+    let m = MRandomize(sharesNum)
+
+    const [T, M, N, p] = CalcConsts(sharesNum, threshold, m);
+
+    m = m.slice(-sharesNum)
+    
 
     if (M.lt(N.times(p))){
         throw new Error('Step 1 requirement is not passed please pick other (k,n values)');
     }
-
-    // STEP 2 encoding
-    const T = M.div(p).minus(1).round(undefined, Big.roundDown).div(2).round()
-    console.log(T.toString(), 'T')
-    // STEPS 3-5
 
 
     function q (ai, THi0, THi1, ci){
@@ -49,26 +77,21 @@ export function encrypt(shares, threshold, secretPixels, covers){
         }
         return false
     }
-    const TH = 64;
+    
     
     const modifiedCovers = [[],[],[],[],[]]
     secretPixels.forEach((x, sindex)=>{
-        let A = 0;
-        let y = 0;
         let qcond = false;
+
+        const rightBound = M.div(p).minus(1).round(undefined, Big.roundDown)
+        const leftBound = T.plus(1)
+        const difference = rightBound.minus(leftBound)
+
+        let y = 0;
         while(!qcond){
             const qcondarr = []
-            if (x>=0 && x<p){
-                const rightBound = M.div(p).minus(1).round(undefined, Big.roundDown)
-                const leftBound = T.plus(1)
-                const difference = rightBound.minus(leftBound)
-                A = difference.times(Math.random()).round().plus(leftBound)
-                y = A.times(p).plus(x)
-            }
-            else {
-                A = T.times(Math.random()).round()
-                y = A.times(p).plus(x).minus(p)
-            }
+            y = CalcY(x, T, leftBound, difference, p);
+
             m.forEach((mi, index) => {      
                 const THi0 = mi/2 - TH 
                 const THi1 = mi/2 + TH
@@ -97,7 +120,7 @@ const threshold = 3
 const covers = [[0,1,0,1],[1,0,1,0],[1,0,0,0],[0,0,1,0],[0,0,0,1]]
 const secretPixels = [255, 125, 148, 200]
 
-const {modifiedCovers, m, T, p} = encrypt(shares, threshold, secretPixels, covers)
+const {modifiedCovers, m, T, p} = encrypt(shares, threshold, secretPixels, covers, TH)
 
 // recovering process
 
